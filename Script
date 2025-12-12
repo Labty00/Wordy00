@@ -1,0 +1,112 @@
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local gui = player:WaitForChild("PlayerGui")
+
+print("Starting word list download...") 
+
+local response = game:HttpGet("https://raw.githubusercontent.com/MrLabbrow/All-English-Words/main/Words.txt")
+print("Download complete. Processing lines...") 
+
+local allLines = {}
+for line in response:gmatch("[^\r\n]+") do
+	line = line:lower()
+	if #line > 1 and line:match("^[a-z]+$") then table.insert(allLines,line) end
+end
+table.sort(allLines)
+print(string.format("Found and sorted %d valid words.", #allLines)) 
+
+local words, batchSize, index = {},500,1
+
+local function loadNextBatch()
+	local totalWords = #allLines 
+	while index <= totalWords do 
+		table.insert(words,allLines[index])
+		index = index + 1
+	end
+	local percent = math.floor((index - 1) / totalWords * 100) 
+	print(string.format("Loading words... %d%% (%d/%d loaded)", percent, index - 1, totalWords)) 
+	print("All words loaded. Ready for use.") 
+end
+loadNextBatch()
+
+local sg = Instance.new("ScreenGui")
+sg.ResetOnSpawn = false
+sg.Parent = gui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0,250,0,200)
+frame.Position = UDim2.new(0.5,-125,0.5,-100)
+frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = sg
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0,10)
+frameCorner.Parent = frame
+
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1,-20,0,28)
+box.Position = UDim2.new(0,10,0,10)
+box.PlaceholderText = "Type prefix..."
+box.ClearTextOnFocus = false
+box.Text = ""
+box.TextScaled = false
+box.TextSize = 12
+box.Font = Enum.Font.Gotham
+box.Parent = frame
+
+local layoutY, buttonHeight = 50,20
+
+local function update()
+	for _,v in pairs(frame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+	local p = box.Text:lower()
+	if #p==0 then return end
+	local start_idx=1
+	for i,w in ipairs(words) do if w>=p then start_idx=i break end end
+	local count=0
+	for i=start_idx,#words do
+		local w=words[i]
+		if not w:match("^"..p) then break end
+		local btn=Instance.new("TextButton")
+		btn.Size=UDim2.new(1,0,0,buttonHeight)
+		btn.Position=UDim2.new(0,0,0,layoutY+(buttonHeight+2)*count)
+		btn.BackgroundColor3=Color3.fromRGB(40,40,40)
+		btn.BorderSizePixel=0
+		btn.TextColor3=Color3.fromRGB(255,255,255)
+		btn.TextScaled=false
+		btn.TextSize = 11
+		btn.Font = Enum.Font.Gotham
+		btn.Text=w
+		btn.AutoButtonColor=true
+		btn.Parent=frame
+		btn.MouseButton1Click:Connect(function()
+			box.Text=w
+			for _,v in pairs(frame:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
+		end)
+		count=count+1
+		if count>=4 then break end
+	end
+end
+box:GetPropertyChangedSignal("Text"):Connect(update)
+
+local toggleGui = Instance.new("ScreenGui")
+toggleGui.ResetOnSpawn=false
+toggleGui.Parent=gui
+
+local toggle = Instance.new("TextButton")
+toggle.Size=UDim2.new(0,60,0,25)
+toggle.Position=UDim2.new(1,-70,0,10)
+toggle.BackgroundColor3=Color3.fromRGB(0,0,0)
+toggle.TextColor3=Color3.fromRGB(0,255,0)
+toggle.Text="Toggle"
+toggle.TextScaled=true
+toggle.Font=Enum.Font.GothamBold
+toggle.Parent=toggleGui
+
+local guiVisible=true
+toggle.MouseButton1Click:Connect(function()
+	guiVisible=not guiVisible
+	sg.Enabled=guiVisible
+	toggle.TextColor3=guiVisible and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+end)
